@@ -20,7 +20,10 @@
             <a th:href="@{estadisticas/investigadores}">Estadisticas Investigadores</a>
             <a th:href="@{estadisticas/recomendaciones}">Recomendaciones</a>
             <a th:href="@{reportes}">reportes buscar</a>
+            <a href="#" onclick="document.getElementById('logoutForm').submit(); return false;">Cerrar Sesión</a>
         </nav>
+        <form id="logoutForm" th:action="@{/logout}" method="post" style="display:none;">
+        </form>
     </header>
 
     <main>
