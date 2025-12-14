@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -27,31 +28,29 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/logout/connect/back-channel")
+                        .disable()
+                )
                 .authorizeHttpRequests(auth -> auth
-                        // Recursos estáticos públicos
                         .requestMatchers("/css/**", "/js/**", "/img/**").permitAll()
-                        // Logout público
-                        .requestMatchers("/logout").permitAll()
-                        // Operaciones de escritura públicas (POST, PUT, DELETE)
+                        .requestMatchers("/logout", "/logout/connect/back-channel").permitAll()
                         .requestMatchers(HttpMethod.POST, "/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/**").permitAll()
-                        // Operaciones GET requieren autenticación
                         .requestMatchers(HttpMethod.GET, "/**").authenticated()
-                        // Cualquier otra solicitud requiere autenticación
                         .anyRequest().authenticated()
                 )
-                // OAuth2 Login con Keycloak
                 .oauth2Login(oauth2 -> oauth2
                         .defaultSuccessUrl("/index", true)
                         .permitAll()
                 )
-                // OAuth2 Resource Server para APIs REST con JWT
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> {})
                 )
-                // Logout con redirección a Keycloak
+                .oidcLogout(logout -> logout
+                        .backChannel(Customizer.withDefaults())
+                )
                 .logout(logout -> logout
                         .logoutUrl("/logout")
                         .logoutSuccessHandler(oidcLogoutSuccessHandler())
@@ -60,7 +59,7 @@ public class SecurityConfiguration {
                         .deleteCookies("JSESSIONID")
                         .permitAll()
                 )
-                // Sesiones para web (OAuth2 Login) pero también soporta stateless para API REST
+                
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 );
@@ -79,7 +78,8 @@ public class SecurityConfiguration {
                     String idToken = user.getIdToken().getTokenValue();
                     String logoutUrl = "http://localhost:8080/realms/Vet_auth_demo/protocol/openid-connect/logout" +
                             "?post_logout_redirect_uri=http://localhost:5003/" +
-                            "&id_token_hint=" + idToken;
+                            "&id_token_hint=" + idToken +
+                            "&client_id=spring-lab";
                     response.sendRedirect(logoutUrl);
                 } else {
                     response.sendRedirect("/");
@@ -91,7 +91,12 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("https://localhost:3003", "http://localhost:3003", "http://localhost:5003"));
+        configuration.setAllowedOrigins(Arrays.asList(
+                "https://localhost:3003", 
+                "http://localhost:3003", 
+                "http://localhost:5003",
+                "http://localhost:8080"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
